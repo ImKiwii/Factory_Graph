@@ -7,4 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(FactoryGraph
     src/main.cpp
+    src/Core/Resource.cpp 
+    include/FactoryGraph/Resource.h
+)
+
+target_include_directories(
+    FactoryGraph PRIVATE include
 )
