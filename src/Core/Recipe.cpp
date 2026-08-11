@@ -5,21 +5,22 @@
 #include <iostream>
 
 //--------------------------------------------------
-void FRecipe::AddResourceToRecipe_Input(EResourceType const resourceType, int const resourceAmount)
+void FRecipe::AddResourceToRecipe_Input(EResourceType const resourceType, float const resourceAmount)
 {
 	m_Resources_Input.push_back(FResource(resourceType, resourceAmount));
 }
 
 //--------------------------------------------------
-void FRecipe::AddResourceToRecipe_Output(EResourceType const resourceType, int const resourceAmount)
+void FRecipe::AddResourceToRecipe_Output(EResourceType const resourceType, float const resourceAmount)
 {
 	m_Resources_Output.push_back(FResource(resourceType, resourceAmount));
 }
 
 //--------------------------------------------------
-FRecipe const & FindCorrespondingRecipe_FromOutputResource(
+void FindCorrespondingRecipe_FromOutputResource(
 	std::vector<FRecipe> const & recipes,
-	FResource const & resourcesNeeded
+	FResource const & resourcesNeeded,
+	FRecipe const * & outputRecipe
 )
 {
 	assert(!recipes.empty());
@@ -27,14 +28,14 @@ FRecipe const & FindCorrespondingRecipe_FromOutputResource(
 	{
 		for (FResource const & resource : recipe.m_Resources_Output)
 		{
-			if (resource.m_ResourceType != resourcesNeeded.m_ResourceType)
+			if (resource != resourcesNeeded)
 				continue;
 			
-			return recipe;
+			outputRecipe = &recipe;
+			return;
 		}
 	}
 	
 	std::cerr << "There is no available recipe for this resource: " << ToString(resourcesNeeded.m_ResourceType) << "/n";
 	assert(false);
-	return recipes[0];
 }

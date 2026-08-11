@@ -32,3 +32,33 @@ std::ostream & operator<<(std::ostream & os, FResource const & resource)
 	return os;
 }
 
+//--------------------------------------------------
+bool operator==(FResource const & resourceA, FResource const & resourceB)
+{
+	return resourceA.m_ResourceType == resourceB.m_ResourceType;
+}
+
+//--------------------------------------------------
+bool operator>(FResource const & resource, float const resourceCount)
+{
+	return resource.m_ResourceCount > resourceCount;
+}
+
+//--------------------------------------------------
+bool operator>=(FResource const & resource, float const resourceCount)
+{
+	return resource.m_ResourceCount >= resourceCount;
+}
+
+//--------------------------------------------------
+bool operator<(FResource const & resource, float const resourceCount)
+{
+	return !(resource >= resourceCount);
+}
+
+//--------------------------------------------------
+bool operator<=(FResource const & resource, float const resourceCount)
+{
+	return !(resource > resourceCount);
+}
+

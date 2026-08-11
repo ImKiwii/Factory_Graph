@@ -32,10 +32,10 @@ static void SetupRecipes(std::vector<FRecipe> & outRecipes)
 	recipe_IronBar.AddResourceToRecipe_Output(EResourceType::Iron_Bar, 1.f);
 	outRecipes.push_back(recipe_IronBar);
 	
-	FRecipe recipe_IronScrew;
-	recipe_IronScrew.AddResourceToRecipe_Input(EResourceType::Iron_Bar, 1.f);
-	recipe_IronScrew.AddResourceToRecipe_Output(EResourceType::Iron_Screw, 4.f);
-	outRecipes.push_back(recipe_IronScrew);
+	//FRecipe recipe_IronScrew;
+	//recipe_IronScrew.AddResourceToRecipe_Input(EResourceType::Iron_Bar, 1.f);
+	//recipe_IronScrew.AddResourceToRecipe_Output(EResourceType::Iron_Screw, 4.f);
+	//outRecipes.push_back(recipe_IronScrew);
 	
 	FRecipe recipe_IronScrew_FromIngot;
 	recipe_IronScrew_FromIngot.AddResourceToRecipe_Input(EResourceType::Iron_Ingot, 5.f);
@@ -53,7 +53,7 @@ static void SetupRecipes(std::vector<FRecipe> & outRecipes)
 //--------------------------------------------------
 static void PrintAllNeededResources(
 	FResource const & resourceNeeded,
-	std::vector<FResource> allResourcesNeeded,
+	std::vector<FResource> const & allResourcesNeeded,
 	std::vector<std::pair<EResourceType, int>> const & resourceComplexities
 )
 {
@@ -61,32 +61,18 @@ static void PrintAllNeededResources(
 	for (auto const& [resource, complexity] : resourceComplexities)
 	{
 		float neededResourcesCount = 0.f;
-		std::vector<int> resourceIndexToRemove;
 		for (int iResource = 0; iResource < allResourcesNeeded.size(); ++iResource)
 		{
 			if (allResourcesNeeded[iResource].m_ResourceType != resource)
 				continue;
 			
 			neededResourcesCount += allResourcesNeeded[iResource].m_ResourceCount;
-			resourceIndexToRemove.push_back(iResource);
 		}
 		
 		if (neededResourcesCount == 0.f)
-		{
 			continue;
-		}
-		
-		for (int iToRemove = resourceIndexToRemove.size() -1; iToRemove >= 0; --iToRemove)
-		{
-			allResourcesNeeded.erase(allResourcesNeeded.begin() + resourceIndexToRemove[iToRemove]);
-		}
 		
 		std::cout << FResource(resource, neededResourcesCount) << std::endl;
-		
-		if (allResourcesNeeded.empty())
-		{
-			break;
-		}
 	}
 }
 
@@ -104,28 +90,37 @@ static std::vector<FResource> GatherAllNecessaryResources(
 	
 	std::vector<FResource> output;
 
+	// Warning, infinite loop possibility depending on the recipes.
 	while (!resourcesNeeded_Queue.empty())
 	{
 		FResource const & currentResource = resourcesNeeded_Queue.front();
-		FRecipe const & correspondingRecipe = FindCorrespondingRecipe_FromOutputResource(recipes, currentResource);
+		FRecipe const * pCorrespondingRecipe = nullptr;
+		FindCorrespondingRecipe_FromOutputResource(recipes, currentResource, pCorrespondingRecipe);
 		
-		float recipeCount = 0.f;
-		for (FResource const & resource : correspondingRecipe.m_Resources_Output)
+		if (pCorrespondingRecipe)
 		{
-			if (resource.m_ResourceType != currentResource.m_ResourceType)
-				continue;
+			float recipeCount = 0.f;
+			for (FResource const & resource : pCorrespondingRecipe->m_Resources_Output)
+			{
+				if (resource != currentResource)
+					continue;
+				
+				if (resource <= 0.f)
+					continue;
+				
+				recipeCount = currentResource.m_ResourceCount / resource.m_ResourceCount;
+				break;
+			}
 			
-			recipeCount = currentResource.m_ResourceCount / resource.m_ResourceCount;
+			
+			for (FResource const & resource : pCorrespondingRecipe->m_Resources_Input)
+			{
+				FResource neededResource(resource.m_ResourceType, resource.m_ResourceCount * recipeCount);
+				
+				resourcesNeeded_Queue.push(neededResource);
+				output.push_back(neededResource);
+			}		
 		}
-		
-		
-		for (FResource const & resource : correspondingRecipe.m_Resources_Input)
-		{
-			FResource neededResource(resource.m_ResourceType, resource.m_ResourceCount * recipeCount);
-			
-			resourcesNeeded_Queue.push(neededResource);
-			output.push_back(neededResource);
-		}		
 		
 		resourcesNeeded_Queue.pop();
 	}
@@ -147,10 +142,8 @@ static void ComputeResourcesComplexity(
 	
 	assert(allCraftingPossibilities.contains(resourceType));
 	
-	int minComplexity = 0;
-	std::vector<std::vector<EResourceType>> const & inputPossible = allCraftingPossibilities.at(resourceType);
-	
-	for (std::vector<EResourceType> const & in : inputPossible)
+	int minComplexity = std::numeric_limits<int>::max();
+	for (std::vector<EResourceType> const & in : allCraftingPossibilities.at(resourceType))
 	{
 		int complexity = 0;
 		for (EResourceType const & inputResource : in)
@@ -162,10 +155,7 @@ static void ComputeResourcesComplexity(
 			assert(resultComplexity.contains(inputResource));
 			complexity += resultComplexity[inputResource];
 		}
-		if (complexity < minComplexity || minComplexity == 0)
-		{
-			minComplexity = complexity;
-		}
+		minComplexity = std::min(minComplexity, complexity);
 	}
 	
 	resultComplexity.insert({resourceType, minComplexity + 1});
@@ -200,11 +190,11 @@ static std::vector<std::pair<EResourceType, int>> ComputeResourcesComplexity(std
 	resultComplexity.begin(),
 	resultComplexity.end());
 
-	std::sort(resourcesOrdered.begin(), resourcesOrdered.end(),
-		[](auto const& a, auto const& b)
-		{
-			return a.second > b.second; // Highest complexity first
-		});
+	std::ranges::sort(resourcesOrdered,
+					[](auto const & a, auto const & b)
+					{
+						return a.second > b.second; // Highest complexity first
+					});
 	
 	return resourcesOrdered;
 }

@@ -13,7 +13,7 @@ enum class EResourceType : int
 
     COUNT
 };
-inline const char * ToString(EResourceType const resourceType);
+const char * ToString(EResourceType const resourceType);
 
 
 
@@ -29,3 +29,16 @@ public:
 
 //--------------------------------------------------
 std::ostream & operator<<(std::ostream & os, FResource const & resource);
+//--------------------------------------------------
+// This == operator ignore the resource count.
+bool operator==(FResource const & resourceA, FResource const & resourceB);
+
+//--------------------------------------------------
+bool operator>(FResource const & resource, float const resourceCount);
+//--------------------------------------------------
+bool operator>=(FResource const & resource, float const resourceCount);
+
+//--------------------------------------------------
+bool operator<(FResource const & resource, float const resourceCount);
+//--------------------------------------------------
+bool operator<=(FResource const & resource, float const resourceCount);
