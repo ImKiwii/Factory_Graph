@@ -1,5 +1,5 @@
-#include "FactoryGraph/Recipe.h"
-#include "FactoryGraph/Resource.h"
+#include "FactoryGraph/Core/Recipe.h"
+#include "FactoryGraph/Core/Resource.h"
 
 #include <assert.h>
 #include <iostream>

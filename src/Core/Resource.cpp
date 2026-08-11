@@ -1,4 +1,4 @@
-#include <FactoryGraph/Resource.h>
+#include "FactoryGraph/Core/Resource.h"
 
 #include <iostream>
 

@@ -8,13 +8,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(FactoryGraph
     src/main.cpp
     src/Core/Resource.cpp 
-    include/FactoryGraph/Resource.h 
+    include/FactoryGraph/Core/Resource.h 
     src/Core/Buildings.cpp
-    include/FactoryGraph/Buildings.h 
+    include/FactoryGraph/Core/Buildings.h 
     src/Core/Recipe.cpp 
-    include/FactoryGraph/Recipe.h
+    include/FactoryGraph/Core/Recipe.h
+    src/Database/Database.cpp 
+    include/FactoryGraph/Database/Database.h
+
+    # SQLite3
+    external/sqlite3/sqlite3.c
+    external/sqlite3/sqlite3.h
+    external/sqlite3/sqlite3ext.h
 )
 
 target_include_directories(
-    FactoryGraph PRIVATE include
+        FactoryGraph PRIVATE
+        include
+        external/sqlite3
 )

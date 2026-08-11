@@ -1,11 +1,14 @@
 
 #include <assert.h>
+#include <fstream>
 #include <iostream>
-#include <queue>
 #include <map>
+#include <queue>
+#include <sstream>
 
-#include "FactoryGraph/Recipe.h"
-#include "FactoryGraph/Resource.h"
+#include "FactoryGraph/Core/Recipe.h"
+#include "FactoryGraph/Core/Resource.h"
+#include "FactoryGraph/Database/Database.h"
 
 //--------------------------------------------------
 static void SetupRecipes(std::vector<FRecipe> & outRecipes)
@@ -199,13 +202,226 @@ static std::vector<std::pair<EResourceType, int>> ComputeResourcesComplexity(std
 	return resourcesOrdered;
 }
 
+
+//--------------------------------------------------
+// Helper function to read a text file (for loading SQL scripts)
+static std::string ReadFileToString(const std::string& filePath)
+{
+	std::ifstream file(filePath);
+	if (!file.is_open())
+	{
+		std::cerr << "Failed to open file: " << filePath << "\n";
+		return "";
+	}
+	
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	return buffer.str();
+}
+
+//--------------------------------------------------
+bool IsNumeric(const std::string& str) {
+	if (str.empty()) return false;
+	for (char c : str) {
+		if (!std::isdigit(c)) return false;
+	}
+	return true;
+}
+
+//--------------------------------------------------
+static void EditDatabase(FDatabase const & database)
+{
+	while (true)
+	{
+		int playerChoice_EditDatabase = 0;
+		std::cout << "---- Edit Database ----\n";
+		std::cout << "1 - Add resource to Database\n";
+		std::cout << "2 - Remove resource from Database\n";
+		std::cout << "3 - Add recipe to Database\n";
+		std::cout << "4 - Remove recipe from Database\n";
+		
+		std::cout << "0 - Back\n";
+		std::cout << "$ ";
+		std::cin >> playerChoice_EditDatabase;
+	
+		switch (playerChoice_EditDatabase)
+		{
+			case 1: // Add resource to Database
+			{
+				while (true)
+				{
+					std::string resourceName = "";
+					
+					std::cout << "Currently existing resources:\n";
+					database.PrintAllResources(false);
+					
+					std::cout << "Resource to add (\"0\" to go back): ";
+					std::cin >> resourceName;
+					
+					if (resourceName == "0") break;
+					
+					bool const success = database.AddResourceToDatabase(resourceName);
+					if (!success)
+					{
+						std::cerr << "Failed to add resource to database.\n";
+					}
+					else
+					{
+						std::cout << "Resource added successfully\n";
+					}
+				}
+			} break;
+			case 2: // Remove resource from Database
+			{
+				while (true)
+				{
+					std::string resourceName = "";
+					
+					std::cout << "Currently existing resources:\n";
+					database.PrintAllResources(true);
+					
+					std::cout << "Resource to remove (ID or resource name) (\"0\" to go back): ";
+					std::cin >> resourceName;
+					
+					if (resourceName == "0") break;
+					
+					bool success = false;
+					if (IsNumeric(resourceName))
+					{
+						success = database.RemoveResourceFromDatabase(stoi(resourceName));
+					}
+					else
+					{
+						success = database.RemoveResourceFromDatabase(resourceName);
+					}
+					
+					if (!success)
+					{
+						std::cerr << "Failed to remove resource from database.\n";
+					}
+					else
+					{
+						std::cout << "Resource removed successfully\n";
+					}
+				}
+			} break;
+			case 0: return;
+		}
+	}				
+}
+
+//--------------------------------------------------
+static void PrintFromDatabase(FDatabase const & database)
+{
+	while (true)
+	{
+		int playerChoice_PrintFromDatabase = 0;
+		std::cout << "---- Print From Database ----\n";
+		std::cout << "1 - Print resource all resources\n";
+		std::cout << "2 - Print all recipes (without input/output)\n";
+		std::cout << "3 - Print all recipes (with input only)\n";
+		std::cout << "4 - Print all recipes (with output only)\n";
+		std::cout << "5 - Print all recipes (with input and output)\n";
+		
+		std::cout << "0 - Back\n";
+		std::cout << "$ ";
+		std::cin >> playerChoice_PrintFromDatabase;
+	
+		switch (playerChoice_PrintFromDatabase)
+		{
+			case 1: // Print resource all resources
+			{
+				database.PrintAllResources(false);
+			} break;
+			case 2: // Print all recipes (without input/output)
+			{
+				database.PrintAllRecipes(false, false, false);
+			} break;
+			case 3: // Print all recipes (with input only)
+			{
+				database.PrintAllRecipes(false, true, false);
+			} break;
+			case 4: // Print all recipes (with output only)
+			{
+				database.PrintAllRecipes(false, false, true);
+			} break;
+			case 5: // Print all recipes (with input and output)
+			{
+				database.PrintAllRecipes(false, true, true);
+			} break;
+			case 0: return;
+		}
+	}				
+}
+
+
 //--------------------------------------------------
 int main()
 {
-	std::vector<FRecipe> recipes;
-	SetupRecipes(recipes);
+	FDatabase database;
+	if (!database.Open("factory_recipes.db"))
+	{
+		std::cerr << "Failed to open database.\n";
+		return 1;
+	}
+	
+	while (true)
+	{
+		int playerChoice = 0;
+		
+		std::cout << "What do you want to do?\n";
+		std::cout << "1 - Edit Database\n";
+		std::cout << "2 - Print from Database\n";
+		
+		std::cout << "4 - Find needed resources for needed resources\n";
+		
+		
+		
+		std::cout << "0 - Quit\n";
+		std::cout << "$ ";
+		std::cin >> playerChoice;
+		
+		switch (playerChoice)
+		{
+			case 1:
+			{
+				EditDatabase(database);
+			} break;
+			case 2:
+			{
+				PrintFromDatabase(database);
+			} break;
+			case 0: return 0;
+		}
+	}
+	
+	
+	
+	
+	
+	
+	// Load and execute schema (CREATE TABLE statements)
+	std::string const schemaSQL = ReadFileToString("schema.sql");
+	if (!schemaSQL.empty() && !database.ExecuteScript(schemaSQL))
+	{
+		std::cerr << "Failed to create database schema.\n";
+		return 1;
+	}
+	
+	// Load and execute seed data (INSERT statements)
+	// Note: The IF NOT EXISTS in schema.sql and IGNORE in inserts means this is safe to run multiple times
+	std::string const seedSQL = ReadFileToString("seeds.sql");
+	if (!seedSQL.empty() && !database.ExecuteScript(seedSQL))
+	{
+		std::cerr << "Failed to seed database.\n";
+		// Don't return here - the database might already have data from a previous run
+	}
+	
+	
+	// Load recipes from the database
+	std::vector<FRecipe> const recipes = database.LoadRecipes();
 
-	std::vector<std::pair<EResourceType, int>> resourceComplexities_Ordered = ComputeResourcesComplexity(recipes);
+	std::vector<std::pair<EResourceType, int>> const resourceComplexities_Ordered = ComputeResourcesComplexity(recipes);
 
 	{
 		FResource const resourceNeeded(EResourceType::Iron_Plate, 10);
