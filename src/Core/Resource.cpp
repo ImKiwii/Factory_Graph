@@ -19,23 +19,23 @@ const char * ToString(EResourceType const resourceType)
 }
 
 //--------------------------------------------------
-FResource::FResource(EResourceType const resourceType, float const resourceCount)
+FResource::FResource(int const resourceId, float const resourceCount)
 {
-    m_ResourceType = resourceType;
+    m_ResourceID = resourceId;
 	m_ResourceCount = resourceCount;
 }
 
 //--------------------------------------------------
 std::ostream & operator<<(std::ostream & os, FResource const & resource)
 {
-	os << resource.m_ResourceCount << " - " << ToString(resource.m_ResourceType) << "\n";
+	//os << resource.m_ResourceCount << " - " << ToString(resource.m_ResourceType) << "\n";
 	return os;
 }
 
 //--------------------------------------------------
 bool operator==(FResource const & resourceA, FResource const & resourceB)
 {
-	return resourceA.m_ResourceType == resourceB.m_ResourceType;
+	return false; //resourceA.m_ResourceType == resourceB.m_ResourceType;
 }
 
 //--------------------------------------------------

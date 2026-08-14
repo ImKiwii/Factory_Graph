@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "FactoryGraph/Database/DataBase.h"
 
 #include "FactoryGraph/Core/Recipe.h"
@@ -5,6 +7,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <set>
 #include <sqlite3.h>
 #include <sstream>
 
@@ -192,6 +195,55 @@ bool FDatabase::RemoveResourceFromDatabase(std::string const & resourceName) con
 	return success;
 }
 
+//--------------------------------------------------
+bool FDatabase::DoesResourcesExist(
+	std::vector<FResource> const & resources
+) const
+{
+	// Insert inside a set to avoid duplicates
+	std::set<int> uniqueIds;
+	for (FResource const & resource : resources)
+	{
+		uniqueIds.insert(resource.m_ResourceID);
+	}
+
+	// Create the query here
+	std::string query = "SELECT COUNT(*) FROM Resource WHERE resource_id IN (";
+	for (int i = 0; i < uniqueIds.size(); ++i)
+	{
+		query += "?";
+		if (i < uniqueIds.size() - 1)
+		{
+			query += ",";
+		}
+	}
+	query += ")";
+	sqlite3_stmt * pStatement = nullptr;
+    
+	int const result = sqlite3_prepare_v2(m_pDatabase, query.c_str(), -1, &pStatement, nullptr);
+	if (result != SQLITE_OK)
+	{
+		std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
+		return false;
+	}
+	
+	int argIndex = 1;
+	for (int id : uniqueIds)
+	{
+		sqlite3_bind_int(pStatement, argIndex++, id);
+	}
+	
+	bool isValid = false;
+	if (sqlite3_step(pStatement) == SQLITE_ROW)
+	{
+		int count = sqlite3_column_int(pStatement, 0);
+		isValid = (count == static_cast<int>(uniqueIds.size()));
+	}
+	
+    sqlite3_finalize(pStatement);
+	return isValid;
+}
+
 
 
 
@@ -256,10 +308,11 @@ void FDatabase::PrintAllRecipes(
 		std::vector<std::string> inputResources;
 		if (printInputResources)
 		{
-			const char * pInputQuery = "SELECT resource_id FROM RecipeInput WHERE recipe_id = ?";
+			const char * pInputResourceNameQuery = 
+				"SELECT name FROM Resource JOIN RecipeInput ON Resource.resource_id=RecipeInput.resource_id WHERE recipe_id=?";
 			sqlite3_stmt * pInputStatement = nullptr;
     
-			int inputResult = sqlite3_prepare_v2(m_pDatabase, pInputQuery, -1, &pInputStatement, nullptr);
+			int inputResult = sqlite3_prepare_v2(m_pDatabase, pInputResourceNameQuery, -1, &pInputStatement, nullptr);
 			if (inputResult != SQLITE_OK)
 			{
 				std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
@@ -270,25 +323,7 @@ void FDatabase::PrintAllRecipes(
 			
 			while (sqlite3_step(pInputStatement) == SQLITE_ROW)
 			{
-				const char * pInputResourceQuery = "SELECT name FROM Resource WHERE resource_id = ?";
-				sqlite3_stmt * pInputResourceStatement = nullptr;
-    
-				int inputResourceResult = sqlite3_prepare_v2(m_pDatabase, pInputResourceQuery, -1, &pInputResourceStatement, nullptr);
-				if (inputResourceResult != SQLITE_OK)
-				{
-					std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
-					return;
-				}
-				
-				int const resourceID = sqlite3_column_int(pInputStatement, 0);
-				sqlite3_bind_int(pInputResourceStatement, 1, resourceID);
-				
-				while (sqlite3_step(pInputResourceStatement) == SQLITE_ROW)
-				{
-					inputResources.push_back(reinterpret_cast<const char*>(sqlite3_column_text(pInputResourceStatement, 0)));
-				}
-				
-				sqlite3_finalize(pInputResourceStatement);
+				inputResources.push_back(reinterpret_cast<const char*>(sqlite3_column_text(pInputStatement, 0)));
 			}
 			
 			sqlite3_finalize(pInputStatement);
@@ -297,10 +332,11 @@ void FDatabase::PrintAllRecipes(
 		std::vector<std::string> outputResources;
 		if (printOutputResources)
 		{
-			const char * pOutputQuery = "SELECT resource_id FROM RecipeOutput WHERE recipe_id = ?";
+			const char * pOutputResourceNameQuery = 
+				"SELECT name FROM Resource JOIN RecipeOutput ON Resource.resource_id=RecipeOutput.resource_id WHERE recipe_id=?";
 			sqlite3_stmt * pOutputStatement = nullptr;
     
-			int outputResult = sqlite3_prepare_v2(m_pDatabase, pOutputQuery, -1, &pOutputStatement, nullptr);
+			int outputResult = sqlite3_prepare_v2(m_pDatabase, pOutputResourceNameQuery, -1, &pOutputStatement, nullptr);
 			if (outputResult != SQLITE_OK)
 			{
 				std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
@@ -311,25 +347,7 @@ void FDatabase::PrintAllRecipes(
 			
 			while (sqlite3_step(pOutputStatement) == SQLITE_ROW)
 			{
-				const char * pOutputResourceQuery = "SELECT name FROM Resource WHERE resource_id = ?";
-				sqlite3_stmt * pOutputResourceStatement = nullptr;
-    
-				int outputResourceResult = sqlite3_prepare_v2(m_pDatabase, pOutputResourceQuery, -1, &pOutputResourceStatement, nullptr);
-				if (outputResourceResult != SQLITE_OK)
-				{
-					std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
-					return;
-				}
-				
-				int const resourceID = sqlite3_column_int(pOutputStatement, 0);
-				sqlite3_bind_int(pOutputResourceStatement, 1, resourceID);
-				
-				while (sqlite3_step(pOutputResourceStatement) == SQLITE_ROW)
-				{
-					outputResources.push_back(reinterpret_cast<const char*>(sqlite3_column_text(pOutputResourceStatement, 0)));
-				}
-				
-				sqlite3_finalize(pOutputResourceStatement);
+				outputResources.push_back(reinterpret_cast<const char*>(sqlite3_column_text(pOutputStatement, 0)));
 			}
 			
 			sqlite3_finalize(pOutputStatement);
@@ -352,6 +370,10 @@ void FDatabase::PrintAllRecipes(
 			{
 				std::cout << "\t\t => \t";
 			}
+			else
+			{
+				std::cout << "\t\t\t\t";
+			}
 			
 			if (iResource < outputSize)
 			{
@@ -363,6 +385,261 @@ void FDatabase::PrintAllRecipes(
 	}
     
 	sqlite3_finalize(pStatement);
+}
+
+//--------------------------------------------------
+bool FDatabase::AddRecipeToDatabase(
+	std::string const & recipeName,
+	std::vector<FResource> const & resourcesInput,
+	std::vector<FResource> const & resourcesOutput
+) const
+{
+	// we first have to check if all the resources exist
+	
+	std::vector<FResource> allResources = resourcesInput;
+	allResources.insert(allResources.end(), resourcesOutput.begin(), resourcesOutput.end());
+	
+	if (!DoesResourcesExist(allResources))
+	{
+		std::cerr << "All listed resources doesn't exist in the database\n";
+		return false;
+	}
+	
+	// Start transaction
+	if (sqlite3_exec(m_pDatabase, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr) != SQLITE_OK) {
+		std::cerr << "Transaction begin failed: " << GetLastError() << "\n";
+		return false;
+	}
+	
+	// Add the recipe into the Recipe table
+	{
+		const char * pQuery = "INSERT INTO Recipe (name) VALUES (?)";
+		sqlite3_stmt * pStatement = nullptr;
+	
+		int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+		if (result != SQLITE_OK)
+		{
+			std::cout << "Failed to prepare query: " << GetLastError() << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			return false;
+		}
+	
+		sqlite3_bind_text(pStatement, 1, recipeName.c_str(), -1, nullptr);
+	
+		if (sqlite3_step(pStatement) != SQLITE_DONE)
+		{
+			std::cerr << "Insert failed: " << sqlite3_errmsg(m_pDatabase) << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			sqlite3_finalize(pStatement);
+			return false;
+		}
+		sqlite3_finalize(pStatement);
+	}
+	
+	int recipeID = sqlite3_last_insert_rowid(m_pDatabase);
+	
+	// Add the input resources into the RecipeInput table
+	{		
+		const char * pQuery = "INSERT INTO RecipeInput (recipe_id, resource_id, amount) VALUES (?, ?, ?)";
+		sqlite3_stmt * pStatement = nullptr;
+	
+		int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+		if (result != SQLITE_OK)
+		{
+			std::cout << "Failed to prepare query: " << GetLastError() << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			return false;
+		}
+		
+		for (FResource const & resource : resourcesInput)
+		{
+			sqlite3_bind_int(pStatement, 1, recipeID);
+        	sqlite3_bind_int(pStatement, 2, resource.m_ResourceID);
+        	sqlite3_bind_double(pStatement, 3, resource.m_ResourceCount);
+        	
+        	if (sqlite3_step(pStatement) != SQLITE_DONE)
+        	{
+        		std::cerr << "Insert failed: " << sqlite3_errmsg(m_pDatabase) << "\n";
+        		sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+        		sqlite3_finalize(pStatement);
+        		return false;
+        	}
+			
+			// reset statement for the next iteration
+			sqlite3_reset(pStatement);
+		}
+		
+		sqlite3_finalize(pStatement);
+	}
+	
+	// Add the output resources into the RecipeOutput table
+	{		
+		const char * pQuery = "INSERT INTO RecipeOutput (recipe_id, resource_id, amount) VALUES (?, ?, ?)";
+		sqlite3_stmt * pStatement = nullptr;
+	
+		int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+		if (result != SQLITE_OK)
+		{
+			std::cout << "Failed to prepare query: " << GetLastError() << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			return false;
+		}
+		
+		for (FResource const & resource : resourcesOutput)
+		{
+			sqlite3_bind_int(pStatement, 1, recipeID);
+        	sqlite3_bind_int(pStatement, 2, resource.m_ResourceID);
+        	sqlite3_bind_double(pStatement, 3, resource.m_ResourceCount);
+        	
+        	if (sqlite3_step(pStatement) != SQLITE_DONE)
+        	{
+        		std::cerr << "Insert failed: " << sqlite3_errmsg(m_pDatabase) << "\n";
+        		sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+        		sqlite3_finalize(pStatement);
+        		return false;
+        	}
+			
+			// reset statement for the next iteration
+			sqlite3_reset(pStatement);
+		}
+		
+		sqlite3_finalize(pStatement);
+	}
+	
+	// Commit transaction - all or nothing
+	if (sqlite3_exec(m_pDatabase, "COMMIT;", nullptr, nullptr, nullptr) != SQLITE_OK) {
+		std::cerr << "Commit failed: " << GetLastError() << "\n";
+		sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+		return false;
+	}
+    
+	std::cout << "Recipe added successfully with ID: " << recipeID << "\n";
+	return true;
+}
+
+//--------------------------------------------------
+bool FDatabase::RemoveRecipeFromDatabase(int recipeID) const
+{
+	// Start transaction
+	if (sqlite3_exec(m_pDatabase, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr) != SQLITE_OK) {
+		std::cerr << "Transaction begin failed: " << GetLastError() << "\n";
+		return false;
+	}
+	
+	// Remove the recipe from the Recipe table
+	{
+		const char * pQuery = "DELETE FROM Recipe WHERE recipe_id = ?";
+		sqlite3_stmt * pStatement = nullptr;
+	
+		int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+		if (result != SQLITE_OK)
+		{
+			std::cout << "Failed to prepare query: " << GetLastError() << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			return false;
+		}
+	
+		sqlite3_bind_int(pStatement, 1, recipeID);
+	
+		if (sqlite3_step(pStatement) != SQLITE_DONE)
+		{
+			std::cerr << "Delete failed: " << sqlite3_errmsg(m_pDatabase) << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			sqlite3_finalize(pStatement);
+			return false;
+		}
+		sqlite3_finalize(pStatement);
+	}
+	
+	// Remove the input resources from the RecipeInput table
+	{		
+		const char * pQuery = "DELETE FROM RecipeInput WHERE recipe_id = ?";
+		sqlite3_stmt * pStatement = nullptr;
+	
+		int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+		if (result != SQLITE_OK)
+		{
+			std::cout << "Failed to prepare query: " << GetLastError() << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			return false;
+		}
+		
+		sqlite3_bind_int(pStatement, 1, recipeID);
+		
+		if (sqlite3_step(pStatement) != SQLITE_DONE)
+		{
+			std::cerr << "Delete failed: " << sqlite3_errmsg(m_pDatabase) << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			sqlite3_finalize(pStatement);
+			return false;
+		}
+		sqlite3_finalize(pStatement);
+	}
+	
+	// Remove the output resources from the RecipeOutput table
+	{		
+		const char * pQuery = "DELETE FROM RecipeOutput WHERE recipe_id = ?";
+		sqlite3_stmt * pStatement = nullptr;
+	
+		int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+		if (result != SQLITE_OK)
+		{
+			std::cout << "Failed to prepare query: " << GetLastError() << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			return false;
+		}
+		
+		sqlite3_bind_int(pStatement, 1, recipeID);
+		
+		if (sqlite3_step(pStatement) != SQLITE_DONE)
+		{
+			std::cerr << "Delete failed: " << sqlite3_errmsg(m_pDatabase) << "\n";
+			sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+			sqlite3_finalize(pStatement);
+			return false;
+		}
+		sqlite3_finalize(pStatement);
+	}
+	
+	// Commit transaction - all or nothing
+	if (sqlite3_exec(m_pDatabase, "COMMIT;", nullptr, nullptr, nullptr) != SQLITE_OK) {
+		std::cerr << "Commit failed: " << GetLastError() << "\n";
+		sqlite3_exec(m_pDatabase, "ROLLBACK;", nullptr, nullptr, nullptr);
+		return false;
+	}
+    
+	std::cout << "Recipe deleted successfully with ID: " << recipeID << "\n";
+	return true;
+}
+
+//--------------------------------------------------
+bool FDatabase::RemoveRecipeFromDatabase(std::string const & recipeName) const
+{
+	bool success = false;
+	// Get the recipe id
+	{
+		const char * pQuery = "SELECT recipe_id FROM Recipe WHERE name = ?";
+		sqlite3_stmt * pStatement = nullptr;
+	
+		int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+		if (result != SQLITE_OK)
+		{
+			std::cout << "Failed to prepare query: " << GetLastError() << "\n";
+			return false;
+		}
+	
+		sqlite3_bind_text(pStatement, 1, recipeName.c_str(), -1, nullptr);
+	
+		while (sqlite3_step(pStatement) == SQLITE_ROW)
+		{
+			int const recipeID = sqlite3_column_int(pStatement, 0);
+			success = RemoveRecipeFromDatabase(recipeID);
+		}
+
+		sqlite3_finalize(pStatement);
+	}
+	
+	return success;
 }
 
 //--------------------------------------------------

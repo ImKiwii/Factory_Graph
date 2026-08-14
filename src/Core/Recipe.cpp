@@ -7,13 +7,13 @@
 //--------------------------------------------------
 void FRecipe::AddResourceToRecipe_Input(EResourceType const resourceType, float const resourceAmount)
 {
-	m_Resources_Input.push_back(FResource(resourceType, resourceAmount));
+	//m_Resources_Input.push_back(FResource(resourceType, resourceAmount));
 }
 
 //--------------------------------------------------
 void FRecipe::AddResourceToRecipe_Output(EResourceType const resourceType, float const resourceAmount)
 {
-	m_Resources_Output.push_back(FResource(resourceType, resourceAmount));
+	//m_Resources_Output.push_back(FResource(resourceType, resourceAmount));
 }
 
 //--------------------------------------------------
@@ -36,6 +36,6 @@ void FindCorrespondingRecipe_FromOutputResource(
 		}
 	}
 	
-	std::cerr << "There is no available recipe for this resource: " << ToString(resourcesNeeded.m_ResourceType) << "/n";
+	//std::cerr << "There is no available recipe for this resource: " << ToString(resourcesNeeded.m_ResourceType) << "/n";
 	assert(false);
 }

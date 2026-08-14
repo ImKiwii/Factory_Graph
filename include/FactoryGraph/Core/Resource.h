@@ -1,5 +1,6 @@
 #pragma once
 #include <iosfwd>
+#include <string>
 
 //--------------------------------------------------
 enum class EResourceType : int
@@ -21,9 +22,9 @@ const char * ToString(EResourceType const resourceType);
 class FResource
 {
 public:
-    explicit FResource(EResourceType const resourceType, float const resourceCount);
+    explicit FResource(int resourceId, float resourceCount);
 
-    EResourceType m_ResourceType = EResourceType::COUNT;
+    int m_ResourceID = 0;
     float m_ResourceCount = 0.f;
 };
 
