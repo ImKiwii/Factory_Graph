@@ -244,7 +244,36 @@ bool FDatabase::DoesResourcesExist(
 	return isValid;
 }
 
-
+//--------------------------------------------------
+bool FDatabase::LoadResourceNames(
+	std::unordered_map<FResourceID, std::string> & resourceNames_FromIDs,
+	std::unordered_map<std::string, FResourceID> & resourceIDs_FromNames
+) const
+{
+	// Query all resources ordered by name
+	const char * pQuery = 
+		"SELECT name, resource_id FROM Resource";	
+	sqlite3_stmt * pStatement = nullptr;
+    
+	int const result = sqlite3_prepare_v2(m_pDatabase, pQuery, -1, &pStatement, nullptr);
+	if (result != SQLITE_OK)
+	{
+		std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
+		return false;
+	}
+	
+	while (sqlite3_step(pStatement) == SQLITE_ROW)
+	{
+		const char * resourceName = reinterpret_cast<const char*>(sqlite3_column_text(pStatement, 0));
+		FResourceID const resourceID = sqlite3_column_int(pStatement, 1);
+    	
+		resourceNames_FromIDs.insert({resourceID, resourceName});
+		resourceIDs_FromNames.insert({resourceName, resourceID});
+	}
+    
+	sqlite3_finalize(pStatement);
+	return true;
+}
 
 
 //--------------------------------------------------//
@@ -455,7 +484,7 @@ bool FDatabase::AddRecipeToDatabase(
 		{
 			sqlite3_bind_int(pStatement, 1, recipeID);
         	sqlite3_bind_int(pStatement, 2, resource.m_ResourceID);
-        	sqlite3_bind_double(pStatement, 3, resource.m_ResourceCount);
+        	sqlite3_bind_double(pStatement, 3, resource.m_ResourceAmount);
         	
         	if (sqlite3_step(pStatement) != SQLITE_DONE)
         	{
@@ -489,7 +518,7 @@ bool FDatabase::AddRecipeToDatabase(
 		{
 			sqlite3_bind_int(pStatement, 1, recipeID);
         	sqlite3_bind_int(pStatement, 2, resource.m_ResourceID);
-        	sqlite3_bind_double(pStatement, 3, resource.m_ResourceCount);
+        	sqlite3_bind_double(pStatement, 3, resource.m_ResourceAmount);
         	
         	if (sqlite3_step(pStatement) != SQLITE_DONE)
         	{
@@ -643,9 +672,91 @@ bool FDatabase::RemoveRecipeFromDatabase(std::string const & recipeName) const
 }
 
 //--------------------------------------------------
-std::vector<FRecipe> FDatabase::LoadRecipes()
+std::vector<FRecipe> FDatabase::LoadRecipes() const
 {
-	return {};
+	std::vector<FRecipe> recipes;
+	
+	const char * pRecipeQuery =	"SELECT name, recipe_id FROM Recipe";
+	sqlite3_stmt * pStatement = nullptr;
+    
+	int const result = sqlite3_prepare_v2(m_pDatabase, pRecipeQuery, -1, &pStatement, nullptr);
+	if (result != SQLITE_OK)
+	{
+		std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
+		return {};
+	}
+	
+	
+	while (sqlite3_step(pStatement) == SQLITE_ROW)
+	{
+		FRecipe currentRecipe;
+		
+		const char * recipeName = reinterpret_cast<const char*>(sqlite3_column_text(pStatement, 0));
+		int const recipeID = sqlite3_column_int(pStatement, 1);
+		
+		currentRecipe.m_RecipeName = recipeName;
+		
+		// Gather all input resources
+		{
+			const char * pInputQuery =
+				"SELECT name, RecipeInput.resource_id, amount FROM RecipeInput JOIN Resource ON RecipeInput.resource_id=Resource.resource_id WHERE recipe_id = ?";
+			sqlite3_stmt * pInputStatement = nullptr;
+    
+			if (sqlite3_prepare_v2(m_pDatabase, pInputQuery, -1, &pInputStatement, nullptr) != SQLITE_OK)
+			{
+				std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
+				return {};
+			}
+			
+			sqlite3_bind_int(pInputStatement, 1, recipeID);
+			
+			while (sqlite3_step(pInputStatement) == SQLITE_ROW)
+			{
+				FResource currentResource_Input;
+				
+				currentResource_Input.m_ResourceName = reinterpret_cast<const char*>(sqlite3_column_text(pInputStatement, 0));
+				currentResource_Input.m_ResourceID = sqlite3_column_int(pInputStatement, 1);
+				currentResource_Input.m_ResourceAmount = static_cast<float>(sqlite3_column_double(pInputStatement, 2));
+				
+				currentRecipe.AddResourceToRecipe_Input(currentResource_Input);
+			}
+			
+			sqlite3_finalize(pInputStatement);
+		}
+		
+		// Gather all output resources
+		{
+			const char * pOutputQuery =	
+				"SELECT name, RecipeOutput.resource_id, amount FROM RecipeOutput JOIN Resource ON RecipeOutput.resource_id=Resource.resource_id WHERE recipe_id = ?";
+			sqlite3_stmt * pOutputStatement = nullptr;
+    
+			if (sqlite3_prepare_v2(m_pDatabase, pOutputQuery, -1, &pOutputStatement, nullptr) != SQLITE_OK)
+			{
+				std::cerr << "Failed to prepare query: " << GetLastError() << "\n";
+				return {};
+			}
+			
+			sqlite3_bind_int(pOutputStatement, 1, recipeID);
+			
+			while (sqlite3_step(pOutputStatement) == SQLITE_ROW)
+			{
+				FResource currentResource_Output;
+				
+				currentResource_Output.m_ResourceName = reinterpret_cast<const char*>(sqlite3_column_text(pOutputStatement, 0));
+				currentResource_Output.m_ResourceID = sqlite3_column_int(pOutputStatement, 1);
+				currentResource_Output.m_ResourceAmount = static_cast<float>(sqlite3_column_double(pOutputStatement, 2));
+				
+				currentRecipe.AddResourceToRecipe_Output(currentResource_Output);
+			}
+			
+			sqlite3_finalize(pOutputStatement);
+		}
+	
+		recipes.push_back(currentRecipe);
+	}
+	
+	sqlite3_finalize(pStatement);
+	return recipes;
 }
 
 

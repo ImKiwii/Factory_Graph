@@ -15,7 +15,9 @@ add_executable(FactoryGraph
     include/FactoryGraph/Core/Recipe.h
     src/Database/Database.cpp 
     include/FactoryGraph/Database/Database.h
-
+    include/FactoryGraph/Utils/Utils.h
+    src/Utils/Utils.cpp
+    
     # SQLite3
     external/sqlite3/sqlite3.c
     external/sqlite3/sqlite3.h

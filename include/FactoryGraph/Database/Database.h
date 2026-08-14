@@ -1,7 +1,10 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "FactoryGraph/Core/Resource.h"
 
 struct FRecipe;
 struct FResource;
@@ -36,6 +39,11 @@ struct FDatabase
 		std::vector<FResource> const & resources
 	) const;
 	
+	bool LoadResourceNames(
+		std::unordered_map<FResourceID, std::string> & resourceNames_FromIDs,
+		std::unordered_map<std::string, FResourceID> & resourceIDs_FromNames
+	) const;
+	
 	//--------------------------//
 	//			Recipes			//
 	//--------------------------//
@@ -51,7 +59,7 @@ struct FDatabase
 	
 	// Loads all recipes from the database
 	// Returns a vector of FRecipe objects populated from the database
-	std::vector<FRecipe> LoadRecipes();
+	std::vector<FRecipe> LoadRecipes() const;
 	
 private:
 	class sqlite3 * m_pDatabase = nullptr;

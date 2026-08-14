@@ -2,52 +2,29 @@
 
 #include <iostream>
 
-const char * ToString(EResourceType const resourceType)
-{
-	switch (resourceType)
-	{
-		case EResourceType::Iron_Ore: return "Iron_Ore";
-		case EResourceType::Iron_Ingot: return "Iron_Ingot";
-		case EResourceType::Iron_Plate: return "Iron_Plate";
-		case EResourceType::Iron_Bar: return "Iron_Bar";
-		case EResourceType::Iron_Screw: return "Iron_Screw";
-		case EResourceType::Reinforced_Plate: return "Reinforced_Plate";
-	}
-	
-	static_assert(static_cast<int>(EResourceType::COUNT) == 6);
-	return "Unknown";
-}
-
-//--------------------------------------------------
-FResource::FResource(int const resourceId, float const resourceCount)
-{
-    m_ResourceID = resourceId;
-	m_ResourceCount = resourceCount;
-}
-
 //--------------------------------------------------
 std::ostream & operator<<(std::ostream & os, FResource const & resource)
 {
-	//os << resource.m_ResourceCount << " - " << ToString(resource.m_ResourceType) << "\n";
+	os << resource.m_ResourceAmount << " - " << resource.m_ResourceName << "\n";
 	return os;
 }
 
 //--------------------------------------------------
 bool operator==(FResource const & resourceA, FResource const & resourceB)
 {
-	return false; //resourceA.m_ResourceType == resourceB.m_ResourceType;
+	return resourceA.m_ResourceID == resourceB.m_ResourceID;
 }
 
 //--------------------------------------------------
 bool operator>(FResource const & resource, float const resourceCount)
 {
-	return resource.m_ResourceCount > resourceCount;
+	return resource.m_ResourceAmount > resourceCount;
 }
 
 //--------------------------------------------------
 bool operator>=(FResource const & resource, float const resourceCount)
 {
-	return resource.m_ResourceCount >= resourceCount;
+	return resource.m_ResourceAmount >= resourceCount;
 }
 
 //--------------------------------------------------

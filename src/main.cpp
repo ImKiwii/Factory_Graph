@@ -1,232 +1,14 @@
 
-#include <assert.h>
-#include <fstream>
 #include <iostream>
 #include <map>
 #include <queue>
-#include <sstream>
+#include <unordered_map>
 
 #include "FactoryGraph/Core/Recipe.h"
 #include "FactoryGraph/Core/Resource.h"
 #include "FactoryGraph/Database/Database.h"
+#include "FactoryGraph/Utils/Utils.h"
 
-//--------------------------------------------------
-static void SetupRecipes(std::vector<FRecipe> & outRecipes)
-{
-	assert(outRecipes.empty());
-	outRecipes.reserve(6);
-	
-	FRecipe recipe_IronOre;
-	recipe_IronOre.AddResourceToRecipe_Output(EResourceType::Iron_Ore, 1.f);
-	outRecipes.push_back(recipe_IronOre);
-	
-	FRecipe recipe_IronIngot;
-	recipe_IronIngot.AddResourceToRecipe_Input(EResourceType::Iron_Ore, 1.f);
-	recipe_IronIngot.AddResourceToRecipe_Output(EResourceType::Iron_Ingot, 1.f);
-	outRecipes.push_back(recipe_IronIngot);
-	
-	FRecipe recipe_IronPlate;
-	recipe_IronPlate.AddResourceToRecipe_Input(EResourceType::Iron_Ingot, 3.f);
-	recipe_IronPlate.AddResourceToRecipe_Output(EResourceType::Iron_Plate, 2.f);
-	outRecipes.push_back(recipe_IronPlate);
-	
-	FRecipe recipe_IronBar;
-	recipe_IronBar.AddResourceToRecipe_Input(EResourceType::Iron_Ingot, 1.f);
-	recipe_IronBar.AddResourceToRecipe_Output(EResourceType::Iron_Bar, 1.f);
-	outRecipes.push_back(recipe_IronBar);
-	
-	//FRecipe recipe_IronScrew;
-	//recipe_IronScrew.AddResourceToRecipe_Input(EResourceType::Iron_Bar, 1.f);
-	//recipe_IronScrew.AddResourceToRecipe_Output(EResourceType::Iron_Screw, 4.f);
-	//outRecipes.push_back(recipe_IronScrew);
-	
-	FRecipe recipe_IronScrew_FromIngot;
-	recipe_IronScrew_FromIngot.AddResourceToRecipe_Input(EResourceType::Iron_Ingot, 5.f);
-	recipe_IronScrew_FromIngot.AddResourceToRecipe_Output(EResourceType::Iron_Screw, 20.f);
-	outRecipes.push_back(recipe_IronScrew_FromIngot);
-	
-	FRecipe recipe_ReinforcedPlate;
-	recipe_ReinforcedPlate.AddResourceToRecipe_Input(EResourceType::Iron_Plate, 6.f);
-	recipe_ReinforcedPlate.AddResourceToRecipe_Input(EResourceType::Iron_Screw, 12.f);
-	recipe_ReinforcedPlate.AddResourceToRecipe_Output(EResourceType::Reinforced_Plate, 1.f);
-	outRecipes.push_back(recipe_ReinforcedPlate);
-}
-
-
-// //--------------------------------------------------
-// static void PrintAllNeededResources(
-// 	FResource const & resourceNeeded,
-// 	std::vector<FResource> const & allResourcesNeeded,
-// 	std::vector<std::pair<EResourceType, int>> const & resourceComplexities
-// )
-// {
-// 	std::cout << "All resources needed for: " << resourceNeeded << std::endl;
-// 	for (auto const& [resource, complexity] : resourceComplexities)
-// 	{
-// 		float neededResourcesCount = 0.f;
-// 		for (int iResource = 0; iResource < allResourcesNeeded.size(); ++iResource)
-// 		{
-// 			if (allResourcesNeeded[iResource].m_ResourceType != resource)
-// 				continue;
-// 			
-// 			neededResourcesCount += allResourcesNeeded[iResource].m_ResourceCount;
-// 		}
-// 		
-// 		if (neededResourcesCount == 0.f)
-// 			continue;
-// 		
-// 		std::cout << FResource(resource, neededResourcesCount) << std::endl;
-// 	}
-// }
-//
-//
-//
-//
-// //--------------------------------------------------
-// static std::vector<FResource> GatherAllNecessaryResources(
-// 	std::vector<FRecipe> const & recipes,
-// 	FResource const & resourcesNeeded
-// )
-// {
-// 	std::queue<FResource> resourcesNeeded_Queue;
-// 	resourcesNeeded_Queue.push(resourcesNeeded);
-// 	
-// 	std::vector<FResource> output;
-//
-// 	// Warning, infinite loop possibility depending on the recipes.
-// 	while (!resourcesNeeded_Queue.empty())
-// 	{
-// 		FResource const & currentResource = resourcesNeeded_Queue.front();
-// 		FRecipe const * pCorrespondingRecipe = nullptr;
-// 		FindCorrespondingRecipe_FromOutputResource(recipes, currentResource, pCorrespondingRecipe);
-// 		
-// 		if (pCorrespondingRecipe)
-// 		{
-// 			float recipeCount = 0.f;
-// 			for (FResource const & resource : pCorrespondingRecipe->m_Resources_Output)
-// 			{
-// 				if (resource != currentResource)
-// 					continue;
-// 				
-// 				if (resource <= 0.f)
-// 					continue;
-// 				
-// 				recipeCount = currentResource.m_ResourceCount / resource.m_ResourceCount;
-// 				break;
-// 			}
-// 			
-// 			
-// 			for (FResource const & resource : pCorrespondingRecipe->m_Resources_Input)
-// 			{
-// 				FResource neededResource(resource.m_ResourceType, resource.m_ResourceCount * recipeCount);
-// 				
-// 				resourcesNeeded_Queue.push(neededResource);
-// 				output.push_back(neededResource);
-// 			}		
-// 		}
-// 		
-// 		resourcesNeeded_Queue.pop();
-// 	}
-// 	
-// 	return output;
-// }
-//
-// //--------------------------------------------------
-// static void ComputeResourcesComplexity(
-// 	std::map<EResourceType, int> & resultComplexity,
-// 	EResourceType resourceType,
-// 	std::map<EResourceType, std::vector<std::vector<EResourceType>>> const & allCraftingPossibilities
-// )
-// {
-// 	if (resultComplexity.contains(resourceType))
-// 	{
-// 		return;
-// 	}
-// 	
-// 	assert(allCraftingPossibilities.contains(resourceType));
-// 	
-// 	int minComplexity = std::numeric_limits<int>::max();
-// 	for (std::vector<EResourceType> const & in : allCraftingPossibilities.at(resourceType))
-// 	{
-// 		int complexity = 0;
-// 		for (EResourceType const & inputResource : in)
-// 		{
-// 			if (!resultComplexity.contains(inputResource))
-// 			{
-// 				ComputeResourcesComplexity(resultComplexity, inputResource, allCraftingPossibilities);
-// 			}
-// 			assert(resultComplexity.contains(inputResource));
-// 			complexity += resultComplexity[inputResource];
-// 		}
-// 		minComplexity = std::min(minComplexity, complexity);
-// 	}
-// 	
-// 	resultComplexity.insert({resourceType, minComplexity + 1});
-// }
-//
-// //--------------------------------------------------
-// static std::vector<std::pair<EResourceType, int>> ComputeResourcesComplexity(std::vector<FRecipe> const & recipes)
-// {
-// 	std::map<EResourceType, int> resultComplexity;
-// 	std::map<EResourceType, std::vector<std::vector<EResourceType>>> allCraftingPossibilities;
-// 	
-// 	for (FRecipe const & recipe : recipes)
-// 	{
-// 		std::vector<EResourceType> input;
-// 		input.reserve(recipe.m_Resources_Input.size());
-// 		for (FResource const & inputResource : recipe.m_Resources_Input)
-// 		{
-// 			input.push_back(inputResource.m_ResourceType);
-// 		}
-// 		for (FResource const & outputResource : recipe.m_Resources_Output)
-// 		{
-// 			allCraftingPossibilities[outputResource.m_ResourceType].push_back(input);
-// 		}
-// 	}
-// 	
-// 	for (const auto & [resourceType, _] : allCraftingPossibilities)
-// 	{
-// 		ComputeResourcesComplexity(resultComplexity, resourceType, allCraftingPossibilities);		
-// 	}
-// 	
-// 	std::vector<std::pair<EResourceType, int>> resourcesOrdered(
-// 	resultComplexity.begin(),
-// 	resultComplexity.end());
-//
-// 	std::ranges::sort(resourcesOrdered,
-// 					[](auto const & a, auto const & b)
-// 					{
-// 						return a.second > b.second; // Highest complexity first
-// 					});
-// 	
-// 	return resourcesOrdered;
-// }
-
-
-//--------------------------------------------------
-// Helper function to read a text file (for loading SQL scripts)
-static std::string ReadFileToString(const std::string& filePath)
-{
-	std::ifstream file(filePath);
-	if (!file.is_open())
-	{
-		std::cerr << "Failed to open file: " << filePath << "\n";
-		return "";
-	}
-	
-	std::stringstream buffer;
-	buffer << file.rdbuf();
-	return buffer.str();
-}
-
-//--------------------------------------------------
-static bool IsNumeric(const std::string& str) {
-	if (str.empty()) return false;
-	for (char c : str) {
-		if (!std::isdigit(c)) return false;
-	}
-	return true;
-}
 
 //--------------------------------------------------
 static void EditDatabase(FDatabase const & database)
@@ -237,7 +19,7 @@ static void EditDatabase(FDatabase const & database)
 		std::cout << "---- Edit Database ----\n";
 		std::cout << "1 - Add resource to Database\n";
 		std::cout << "2 - Remove resource from Database\n";
-		std::cout << "3 - Add recipe to Database\n";
+		std::cout << "3 - Add recipe to Database (@todo - waiting for visual interface)\n";
 		std::cout << "4 - Remove recipe from Database\n";
 		
 		
@@ -440,6 +222,109 @@ static void PrintFromDatabase(FDatabase const & database)
 	}				
 }
 
+//--------------------------------------------------
+static void FindNeededResources(
+	FDatabase const & database,
+	std::vector<FRecipe> const & recipes,
+	std::unordered_map<FResourceID, std::string> const & resourceNames_FromIDs,
+	std::unordered_map<std::string, FResourceID> const & resourceIDs_FromNames,
+	std::vector<std::pair<FResourceID, int>> const & resourceComplexities_Ordered
+)
+{
+	while (true)
+	{
+		std::cout << "---------------------------------------\n";
+		std::cout << "-------- Find Needed Resources --------\n";
+		std::cout << "---------------------------------------\n";
+		
+		FResource resourceNeeded;
+		
+		// First step: get the resource name or id
+		{
+			// Reset the resource
+			resourceNeeded = FResource();
+			
+			std::string playerChoice_NeededResource = "";
+			
+			std::cout << "All resources available:\n";
+			database.PrintAllResources(true);
+		
+			std::cout << "0 - Back\n";
+			std::cout << "ResourceName OR ResourceID: ";
+			std::cin >> playerChoice_NeededResource;
+			
+			if (playerChoice_NeededResource == "0")
+				return;
+			
+			if (IsNumeric(playerChoice_NeededResource))
+			{
+				resourceNeeded.m_ResourceID = stoi(playerChoice_NeededResource);
+				if (!resourceNames_FromIDs.contains(resourceNeeded.m_ResourceID))
+				{
+					std::cerr << "Invalid resource ID.\n";
+					continue;
+				}
+				resourceNeeded.m_ResourceName = resourceNames_FromIDs.at(resourceNeeded.m_ResourceID);
+			}
+			else
+			{
+				if (!resourceIDs_FromNames.contains(playerChoice_NeededResource))
+				{
+					std::cerr << "Invalid resource Name.\n";
+					continue;
+				}
+				
+				resourceNeeded.m_ResourceName = playerChoice_NeededResource;
+				resourceNeeded.m_ResourceID = resourceIDs_FromNames.at(resourceNeeded.m_ResourceName);
+			}
+		}
+		
+		
+		// Second step: get the resource amount
+		{
+			bool shouldExit = false;
+			
+			while (resourceNeeded.m_ResourceAmount <= 0.f)
+			{
+				std::string playerChoice_ResourceAmount = "";
+				
+				std::cout << "0 - Back\n";
+				std::cout << "Quantity of \"" << resourceNeeded.m_ResourceName << "\" (> 0.0f): ";
+				
+				std::cin >> playerChoice_ResourceAmount;
+				
+				
+				if (playerChoice_ResourceAmount == "0")
+				{
+					shouldExit = true;
+					break;
+				}
+				
+				float resourceAmount = 0.f;
+				if (!IsPositiveFloat(playerChoice_ResourceAmount, resourceAmount))
+				{
+					std::cerr << "Invalid resource quantity, should be positive.\n";
+					continue;
+				}
+				
+				resourceNeeded.m_ResourceAmount = resourceAmount;
+			}
+			
+			// Restart the process to the resource name.
+			if (shouldExit)
+				continue;
+		}
+		
+		
+		// Third step: get the all the necessary resources
+		{
+			std::vector<FResource> const output = GatherAllNecessaryResources(recipes, resourceNeeded);
+			PrintAllNeededResources(resourceNeeded, output, resourceComplexities_Ordered, resourceNames_FromIDs);
+		}
+	}
+	
+	
+}
 
 //--------------------------------------------------
 int main()
@@ -451,36 +336,58 @@ int main()
 		return 1;
 	}
 	
-	database.AddRecipeToDatabase(
-		"testRecipe",
-		{
-			FResource(3, 10),
-			FResource(4, 20),
-			FResource(5, 30)
-		},
-		{
-			FResource(6, 10),
-			FResource(3, 10)
-		}
-	);
-	
-	database.AddRecipeToDatabase(
-		"testRecipe",
-		{
-			FResource(7, 10),
-			FResource(4, 20),
-			FResource(5, 30)
-		},
-		{
-			FResource(6, 10)
-		}
-	);
+	// database.AddRecipeToDatabase(
+	// 	"testRecipe",
+	// 	{
+	// 		FResource(3, 10),
+	// 		FResource(4, 20),
+	// 		FResource(5, 30)
+	// 	},
+	// 	{
+	// 		FResource(6, 10),
+	// 		FResource(3, 10)
+	// 	}
+	// );
+	//
+	// database.AddRecipeToDatabase(
+	// 	"testRecipe",
+	// 	{
+	// 		FResource(7, 10),
+	// 		FResource(4, 20),
+	// 		FResource(5, 30)
+	// 	},
+	// 	{
+	// 		FResource(6, 10)
+	// 	}
+	// );
 	
 	
 	
 	// Load recipes from the database
 	std::vector<FRecipe> recipes = database.LoadRecipes();
-	//std::vector<std::pair<EResourceType, int>> resourceComplexities_Ordered = ComputeResourcesComplexity(recipes);
+	std::unordered_map<FResourceID, std::string> resourceNames_FromIDs;
+	std::unordered_map<std::string, FResourceID> resourceIDs_FromNames;
+	database.LoadResourceNames(resourceNames_FromIDs, resourceIDs_FromNames);
+	std::vector<std::pair<FResourceID, int>> resourceComplexities_Ordered = ComputeResourcesComplexity(recipes);
+	
+
+	
+	// {
+	// 	FResource const resourceNeeded(3, 10, "Iron_Plate");
+	// 	std::vector<FResource> const output = GatherAllNecessaryResources(recipes, resourceNeeded);
+	// 	PrintAllNeededResources(resourceNeeded, output, resourceComplexities_Ordered, resourceNames);
+	// }
+	// {
+	// 	FResource const resourceNeeded(5, 10, "Iron_Screw");
+	// 	std::vector<FResource> const output = GatherAllNecessaryResources(recipes, resourceNeeded);
+	// 	PrintAllNeededResources(resourceNeeded, output, resourceComplexities_Ordered, resourceNames);
+	// }
+	// {
+	// 	FResource const resourceNeeded(6, 10, "Reinforced_Plate");
+	// 	std::vector<FResource> const output = GatherAllNecessaryResources(recipes, resourceNeeded);
+	// 	PrintAllNeededResources(resourceNeeded, output, resourceComplexities_Ordered, resourceNames);
+	// }
+	
 	
 	while (true)
 	{
@@ -517,6 +424,16 @@ int main()
 			{
 				PrintFromDatabase(database);
 			} break;
+			case 4:
+			{
+				FindNeededResources(
+					database,
+					recipes,
+					resourceNames_FromIDs,
+					resourceIDs_FromNames,
+					resourceComplexities_Ordered
+				);
+			} break;
 			case 0: return 0;
 			default:
 			{
@@ -524,27 +441,4 @@ int main()
 			}
 		}
 	}
-	
-	
-	
-	
-
-
-	//{
-	//	FResource const resourceNeeded(EResourceType::Iron_Plate, 10);
-	//	std::vector<FResource> const output = GatherAllNecessaryResources(recipes, resourceNeeded);
-	//	PrintAllNeededResources(resourceNeeded, output, resourceComplexities_Ordered);
-	//}
-	//{
-	//	FResource const resourceNeeded(EResourceType::Iron_Screw, 10);
-	//	std::vector<FResource> const output = GatherAllNecessaryResources(recipes, resourceNeeded);
-	//	PrintAllNeededResources(resourceNeeded, output, resourceComplexities_Ordered);
-	//}
-	//{
-	//	FResource const resourceNeeded(EResourceType::Reinforced_Plate, 10);
-	//	std::vector<FResource> const output = GatherAllNecessaryResources(recipes, resourceNeeded);
-	//	PrintAllNeededResources(resourceNeeded, output, resourceComplexities_Ordered);
-	//}
-	
-	return 0;
 }
